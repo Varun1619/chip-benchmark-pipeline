@@ -63,6 +63,19 @@ keeps a restart idempotent, since the init container must still exit 0 for the
 readiness gate to hold, while a genuine broker failure still surfaces as a
 non-zero exit.
 
+### Messages are keyed by configuration, and that skews the partitions
+
+Every run is published with `config_id` as the key, so all runs for a
+configuration land on one partition and stay in order. The rolling baselines
+in the analytics layer read a per configuration history, and ordering is
+cheaper to preserve here than to restore later.
+
+The cost is uneven partitions. With 8 configurations and 6 partitions, the
+default murmur2 hash puts every key on 4 of them and leaves 2 empty, which a
+run of the stack confirms. That is the accepted trade: ordering per key matters
+more than balance at this cardinality, and adding parts to the catalogue
+spreads the load without any change to the topic.
+
 ### One settings model, not four
 
 `src/common/config.py` holds a single `pydantic-settings` model. Every service
