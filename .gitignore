@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Environment
+.env
+.env.local
+
+# Data lake, warehouse and streaming checkpoints.
+# The sample snapshot committed for the hosted dashboard is the only exception.
+data/*
+!data/.gitkeep
+!data/sample/
+!data/sample/**
+
+# DuckDB artifacts written outside data/
+*.duckdb
+*.duckdb.wal
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+logs/
+
+# dbt
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
