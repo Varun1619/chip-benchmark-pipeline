@@ -1,0 +1,17 @@
+# Normalise line endings so files copied into the Linux containers keep LF.
+# A CRLF Makefile or entrypoint script fails inside the images.
+* text=auto eol=lf
+
+Makefile text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.parquet binary
+*.duckdb binary
