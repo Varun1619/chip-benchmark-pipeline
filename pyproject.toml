@@ -22,7 +22,6 @@ dependencies = [
 [project.optional-dependencies]
 producer = [
   "confluent-kafka>=2.6,<3.0",
-  "numpy>=1.26,<3.0",
 ]
 consumer = [
   "pyspark==3.5.3",
@@ -86,6 +85,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D100", "D103", "ARG001"]
+# The catalogues are reference tables. Aligned rows read better than one
+# field per line, which costs a few long lines and nothing else.
+"src/producer/catalog.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -103,9 +105,26 @@ warn_return_any = true
 strict_equality = true
 pretty = true
 
-# Neither PySpark nor the Streamlit ecosystem ships complete stubs.
+# Neither PySpark nor the Streamlit ecosystem ships complete stubs. Both the
+# bare name and the wildcard are listed, because a wildcard alone does not
+# match the top level module.
 [[tool.mypy.overrides]]
-module = ["pyspark.*", "confluent_kafka.*", "streamlit.*", "plotly.*", "duckdb.*"]
+module = [
+  "pyspark", "pyspark.*",
+  "confluent_kafka", "confluent_kafka.*",
+  "streamlit", "streamlit.*",
+  "plotly", "plotly.*",
+  "duckdb", "duckdb.*",
+]
+ignore_missing_imports = true
+
+# Do not descend into these packages' own stubs. The numpy stubs use `type`
+# statements, which are 3.12 syntax, so parsing them fails the whole run while
+# saying nothing about this project's code.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*", "pandas", "pandas.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
