@@ -45,6 +45,14 @@ class Settings(BaseSettings):
         default=0,
         description="Stop after this many events. 0 produces until the process is stopped.",
     )
+    producer_backfill_days: int = Field(
+        default=45,
+        description="History to generate at startup so rolling baselines have data at once.",
+    )
+    producer_backfill_runs_per_day: int = Field(
+        default=400,
+        description="Runs per simulated day during backfill. 0 skips the backfill.",
+    )
 
     data_root: Path = Field(
         default=Path("data"),
@@ -66,11 +74,15 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         return value
 
-    @field_validator("producer_max_events")
+    @field_validator(
+        "producer_max_events",
+        "producer_backfill_days",
+        "producer_backfill_runs_per_day",
+    )
     @classmethod
-    def _max_events_is_not_negative(cls, value: int) -> int:
+    def _count_is_not_negative(cls, value: int) -> int:
         if value < 0:
-            msg = "producer_max_events must be 0 or greater"
+            msg = "counts must be 0 or greater"
             raise ValueError(msg)
         return value
 

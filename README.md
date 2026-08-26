@@ -61,6 +61,43 @@ for the design decisions behind each hop.
 | Transform | dbt-duckdb | Versioned SQL models with tests and lineage instead of ad hoc scripts |
 | Serving | Streamlit | Reads DuckDB directly and deploys free on Streamlit Community Cloud |
 
+## The synthetic data
+
+Results are derived, not drawn at random. Throughput comes from the capability
+of the block that bottlenecks the benchmark, power from the part's TDP and
+process node, and latency from throughput and batch size. Relationships that
+hold in silicon therefore hold in the data, which is what makes the analytics
+worth building.
+
+The catalogue has 8 configurations across mobile, edge, and datacenter parts,
+and 17 benchmarks across the four workload categories. One part appears twice
+with different memory, so a memory effect can be separated from a part effect.
+
+Four effects are injected on purpose, so the analytics layer has something real
+to find:
+
+Run to run noise, lognormal at roughly 3.5 percent, so a single sample never
+settles whether something regressed.
+
+Thermal throttling, weighted by segment, workload intensity, and duration.
+Mobile parts on sustained graphics work throttle most, which drops throughput
+while temperature and power rise.
+
+Driver attributed regressions and improvements. Each is narrow, hitting one SoC
+family and one benchmark from one driver version onward, so it disappears in an
+aggregate over everything and only shows up when the data is cut properly.
+
+Failed and timed out runs carrying no measurements, at roughly 2 percent, so the
+models have to handle nulls instead of assuming every row has a score.
+
+The generator is seeded, so `PRODUCER_SEED` reproduces a stream exactly. Each
+message is keyed by `config_id`, which keeps every run for a configuration on
+one partition and in order, which is what the rolling baselines depend on.
+
+At startup the producer backfills `PRODUCER_BACKFILL_DAYS` of history before
+switching to live publishing, so the dashboard has trends on first load rather
+than after a day of waiting.
+
 ## Quickstart
 
 Requires Docker Desktop or Docker Engine with compose v2. Nothing else needs to
@@ -158,7 +195,7 @@ what runs today.
 | Phase | Branch | Delivers | Status |
 | --- | --- | --- | --- |
 | 1 | `feat/scaffold` | Repo layout, shared settings, compose stack, images, CI | Done |
-| 2 | `feat/producer` | Synthetic benchmark generator and Redpanda producer | Not started |
+| 2 | `feat/producer` | Synthetic benchmark generator and Redpanda producer | Done |
 | 3 | `feat/spark-consumer` | Structured streaming job writing partitioned Parquet | Not started |
 | 4 | `feat/dbt-models` | Staging and mart models, regression detection, leaderboard | Not started |
 | 5 | `feat/dashboard` | Streamlit app on DuckDB | Not started |
