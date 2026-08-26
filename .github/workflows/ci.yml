@@ -29,10 +29,12 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
+      # The producer extra is needed because the publisher tests import the
+      # Kafka client module before replacing it with a fake.
       - name: Install project and dev tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev,producer]"
 
       - name: Lint
         run: ruff check --output-format=github .
