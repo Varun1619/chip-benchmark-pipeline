@@ -1,0 +1,135 @@
+name: chip-benchmark-pipeline
+
+# Every Python service reads the same settings model, so the common variables
+# live in one anchor instead of being repeated per service.
+x-common-env: &common-env
+  REDPANDA_BROKERS: ${REDPANDA_BROKERS:-redpanda:9092}
+  BENCHMARK_TOPIC: ${BENCHMARK_TOPIC:-benchmark.runs.raw}
+  DATA_ROOT: ${DATA_ROOT:-/data}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+services:
+  redpanda:
+    image: redpandadata/redpanda:v24.2.18
+    container_name: cbp-redpanda
+    command:
+      - redpanda
+      - start
+      - --mode dev-container
+      - --smp 1
+      - --default-log-level=info
+      # Two listeners: one for containers on this network, one for the host.
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+    # Host ports are configurable because 19092, 4040 and 8080 are commonly
+    # taken. The container side never changes, so nothing else has to move.
+    ports:
+      - "${REDPANDA_HOST_PORT:-19092}:19092" # Kafka API from the host
+      - "${REDPANDA_ADMIN_PORT:-19644}:9644" # Admin API, for rpk from the host
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -qE 'Healthy:.+true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  # Creating the topic explicitly fixes the partition count, which sets the
+  # read parallelism available to the Spark consumer. Relying on auto-create
+  # would give one partition.
+  redpanda-init:
+    image: redpandadata/redpanda:v24.2.18
+    container_name: cbp-redpanda-init
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >
+        rpk topic create ${BENCHMARK_TOPIC:-benchmark.runs.raw}
+        --brokers redpanda:9092 --partitions 6 --replicas 1
+        || rpk topic describe ${BENCHMARK_TOPIC:-benchmark.runs.raw}
+        --brokers redpanda:9092
+    restart: "no"
+
+  producer:
+    build:
+      context: .
+      dockerfile: docker/producer/Dockerfile
+    image: cbp-producer:local
+    container_name: cbp-producer
+    depends_on:
+      redpanda-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *common-env
+      PRODUCER_EVENTS_PER_SECOND: ${PRODUCER_EVENTS_PER_SECOND:-25}
+      PRODUCER_SEED: ${PRODUCER_SEED:-42}
+      PRODUCER_MAX_EVENTS: ${PRODUCER_MAX_EVENTS:-0}
+    restart: unless-stopped
+
+  spark-consumer:
+    build:
+      context: .
+      dockerfile: docker/spark-consumer/Dockerfile
+    image: cbp-spark-consumer:local
+    container_name: cbp-spark-consumer
+    depends_on:
+      redpanda-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *common-env
+      SPARK_TRIGGER_INTERVAL: ${SPARK_TRIGGER_INTERVAL:-30 seconds}
+    volumes:
+      - ./data:/data
+    ports:
+      - "${SPARK_UI_PORT:-4040}:4040" # Spark UI while the streaming query runs
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/dashboard/Dockerfile
+    image: cbp-analytics:local
+    container_name: cbp-dashboard
+    environment:
+      <<: *common-env
+      DASHBOARD_PORT: 8501
+    volumes:
+      - ./data:/data
+    ports:
+      - "${DASHBOARD_PORT:-8501}:8501"
+    restart: unless-stopped
+
+  # dbt shares the dashboard image because both need duckdb and neither needs
+  # Spark or a Kafka client. Runs on demand, not as a long lived service.
+  dbt:
+    build:
+      context: .
+      dockerfile: docker/dashboard/Dockerfile
+    image: cbp-analytics:local
+    profiles: ["transform"]
+    environment:
+      <<: *common-env
+    volumes:
+      - ./data:/data
+    working_dir: /app
+    entrypoint: ["dbt"]
+    command: ["build", "--project-dir", "/app/src/dbt_project"]
+
+  # Web UI for inspecting topics and messages during a demo.
+  redpanda-console:
+    image: redpandadata/console:v2.7.2
+    container_name: cbp-redpanda-console
+    profiles: ["console"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "${CONSOLE_PORT:-8080}:8080"
+
+volumes:
+  redpanda-data:

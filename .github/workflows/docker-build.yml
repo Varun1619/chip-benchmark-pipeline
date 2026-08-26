@@ -1,0 +1,49 @@
+name: docker-build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: docker-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    name: build ${{ matrix.service }} image
+    runs-on: ubuntu-latest
+    strategy:
+      # Report every broken image in one run instead of stopping at the first.
+      fail-fast: false
+      matrix:
+        service: [producer, spark-consumer, dashboard]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/${{ matrix.service }}/Dockerfile
+          push: false
+          tags: chip-benchmark-pipeline/${{ matrix.service }}:ci
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  compose:
+    name: validate compose file
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Catches YAML errors, bad anchors and unresolvable variables without
+      # starting any container.
+      - name: Render the merged configuration
+        run: docker compose config --quiet

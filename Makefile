@@ -5,7 +5,7 @@ COMPOSE := docker compose
 DBT_DIR := /app/src/dbt_project
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart ps logs build test lint format typecheck check dbt-run dbt-test clean
+.PHONY: help up down restart ps logs build test lint format typecheck check console dbt-run dbt-test clean
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -44,11 +44,16 @@ typecheck: ## Run mypy
 
 check: lint typecheck test ## Everything CI runs
 
+console: ## Start the Redpanda console on http://localhost:8080
+	$(COMPOSE) --profile console up -d redpanda-console
+
+# --profile is a compose level flag, so it goes before the subcommand. The dbt
+# service sets dbt as its entrypoint, so only the subcommand is passed here.
 dbt-run: ## Build the dbt models against the DuckDB warehouse
-	$(COMPOSE) run --rm --profile transform dbt dbt build --project-dir $(DBT_DIR)
+	$(COMPOSE) --profile transform run --rm dbt build --project-dir $(DBT_DIR)
 
 dbt-test: ## Run dbt tests only
-	$(COMPOSE) run --rm --profile transform dbt dbt test --project-dir $(DBT_DIR)
+	$(COMPOSE) --profile transform run --rm dbt test --project-dir $(DBT_DIR)
 
 clean: ## Remove local caches and generated data (keeps the sample snapshot)
 	rm -rf .pytest_cache .ruff_cache .mypy_cache htmlcov .coverage
