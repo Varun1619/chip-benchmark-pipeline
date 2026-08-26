@@ -3,8 +3,10 @@ name: ci
 on:
   pull_request:
     branches: [main]
+  # Phase branches run the same checks before a pull request exists, so a
+  # failure surfaces on the branch that caused it.
   push:
-    branches: [main]
+    branches: [main, "feat/**", "fix/**"]
 
 concurrency:
   group: ci-${{ github.ref }}
