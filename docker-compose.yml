@@ -117,6 +117,8 @@ services:
     profiles: ["transform"]
     environment:
       <<: *common-env
+      DUCKDB_PATH: ${DUCKDB_PATH:-/data/warehouse/benchmarks.duckdb}
+      LAKE_PATH: ${LAKE_PATH:-/data/lake/benchmark_runs}
     volumes:
       - ./data:/data
     working_dir: /app

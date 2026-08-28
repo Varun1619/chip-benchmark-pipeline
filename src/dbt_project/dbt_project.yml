@@ -1,0 +1,36 @@
+name: chip_benchmark
+version: "1.0.0"
+config-version: 2
+
+profile: chip_benchmark
+
+model-paths: ["models"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Runs of the same cell that a baseline is averaged over. Thirty gives a
+  # stable mean without reaching so far back that a fixed regression still
+  # drags the baseline down.
+  baseline_window: 30
+  # Below this many prior runs a z-score is noise, so no alert is raised.
+  min_baseline_samples: 10
+  # A run has to breach both of these to count as regressed. The z-score alone
+  # fires on a benchmark that is simply very stable, and the percentage alone
+  # fires on a noisy one.
+  regression_zscore: -3.0
+  regression_pct: -5.0
+  # Driver over driver comparison. A cell needs this many runs on both versions
+  # before a median is worth comparing, and this much movement to be called.
+  min_cell_runs: 5
+  version_change_pct: 8.0
+
+models:
+  chip_benchmark:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts

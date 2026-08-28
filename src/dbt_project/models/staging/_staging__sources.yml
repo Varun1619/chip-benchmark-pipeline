@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+  - name: lake
+    description: >
+      Parquet written by the Spark structured streaming consumer. Read in place
+      through DuckDB rather than loaded, so there is no copy to keep in sync.
+    meta:
+      external_location: >
+        read_parquet('{{ env_var('LAKE_PATH', '/data/lake/benchmark_runs') }}/**/*.parquet',
+        hive_partitioning = true)
+    tables:
+      - name: benchmark_runs
+        description: >
+          One row per benchmark attempt as it arrived. Contains duplicates,
+          because Kafka delivers at least once and a restarted producer replays
+          its seeded backfill. Deduplicated in stg_benchmark_runs.
