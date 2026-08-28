@@ -157,13 +157,60 @@ a phase reads as one unit in the history.
 | 5 | `feat/dashboard` | Streamlit views over the marts |
 | 6 | `feat/deploy-docs` | Hosted deployment, screenshots, results, contributor docs |
 
-## Decisions still open
+## What the lake is partitioned by, and why only by date
 
-The benchmark record schema is defined in Phase 2. It sets the partition columns
-for the lake, which in turn constrain the dbt models, so it is settled before the
-generator is written rather than after.
+The first working run partitioned by `run_date` and `workload_category`. That
+produced 1819 Parquet files averaging 33 KB across 234 directories for 59 MB of
+data, and a micro-batch took over 20 minutes against a host bind mount, with the
+streaming metadata log alone taking 29 seconds to compact.
 
-Regression detection in Phase 4 compares each run against a rolling baseline for
-its own configuration and workload pair, reporting both a z-score and a percent
-deviation. The baseline window length and the alert thresholds are chosen once
-there is generated data to look at.
+Partitioning by date only, and repartitioning on that column before the write so
+each date gets one file per batch, brought the same data to 169 files averaging
+275 KB. Category remains a normal column, so nothing downstream loses the ability
+to filter on it. At this volume a second partition level multiplies directory
+count by four and prunes nothing worth having.
+
+Checkpoints also moved off the bind mount into a container volume. Nobody
+inspects them, and the metadata log is rewritten constantly, so paying host
+filesystem costs for it buys nothing.
+
+## The grain a comparison has to use
+
+Measured on generated data, the things that move a throughput number, largest
+first:
+
+| Factor | Effect on throughput |
+| --- | --- |
+| `batch_size` | up to 2x |
+| `precision` | up to 3.1x |
+| Thermal throttling | around 18 percent |
+| An injected driver regression | 13 percent |
+| Run to run noise | 3.5 percent |
+
+The signal a performance team cares about is fourth on that list. Aggregating a
+family and a benchmark across precisions and batch sizes showed a 13 percent
+regression as a 2.6 percent dip, while a benchmark with nothing wrong with it
+swung 40 percent purely on batch mix.
+
+Holding configuration, benchmark, precision, and batch size fixed, an unaffected
+benchmark is stable within about 2 percent across every driver version, and the
+regression shows up at its true size in the version it was introduced in.
+
+Two consequences for the models:
+
+The baseline grain is `config_id`, `benchmark_name`, `precision`, `batch_size`.
+Anything coarser mixes populations and hides real regressions.
+
+Throttled runs are excluded from the baseline rather than averaged into it.
+Throttling moves a result further than the regression does, so leaving it in
+means the baseline tracks cooling conditions instead of performance.
+
+## Duplicates are expected, and removed in staging
+
+A measured lake held 366328 rows for 280518 distinct `run_id` values. Two causes,
+both normal. Kafka delivery is at least once, and a restarted producer replays
+its seeded backfill, which is a deliberate property of a reproducible generator.
+
+Deduplication belongs in the dbt staging layer, keyed on `run_id`, rather than in
+the consumer. The lake stays a faithful record of what arrived, and the models
+present one row per run.

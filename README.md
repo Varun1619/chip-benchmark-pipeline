@@ -98,6 +98,30 @@ At startup the producer backfills `PRODUCER_BACKFILL_DAYS` of history before
 switching to live publishing, so the dashboard has trends on first load rather
 than after a day of waiting.
 
+## Ingestion and the lake
+
+The consumer reads the topic with Spark structured streaming and writes Parquet
+partitioned by `run_date`. Two queries run against one topic read. Usable runs go
+to the lake, and records that cannot be parsed go to a quarantine path with their
+raw bytes and a reason, because a silently dropped record is a silently wrong
+dashboard. Each query has its own checkpoint, so both recover independently.
+
+Measured on a 45 day backfill: 366328 records ingested, 169 Parquet files
+averaging 275 KB, batches completing inside the 30 second trigger at over 7000
+rows per second.
+
+Two properties of the data that the models have to handle rather than assume
+away, both documented in [docs/architecture.md](docs/architecture.md):
+
+Records repeat. Kafka delivers at least once, and a restarted producer replays
+its seeded backfill. Deduplication happens in dbt staging on `run_id`, so the
+lake stays a faithful record of what arrived.
+
+Comparisons need a fine grain. `batch_size` and `precision` move throughput
+further than a regression does, and thermal throttling moves it further still, so
+a baseline is built per configuration, benchmark, precision, and batch size, with
+throttled runs held out.
+
 ## Quickstart
 
 Requires Docker Desktop or Docker Engine with compose v2. Nothing else needs to
@@ -196,7 +220,7 @@ what runs today.
 | --- | --- | --- | --- |
 | 1 | `feat/scaffold` | Repo layout, shared settings, compose stack, images, CI | Done |
 | 2 | `feat/producer` | Synthetic benchmark generator and Redpanda producer | Done |
-| 3 | `feat/spark-consumer` | Structured streaming job writing partitioned Parquet | Not started |
+| 3 | `feat/spark-consumer` | Structured streaming job writing partitioned Parquet | Done |
 | 4 | `feat/dbt-models` | Staging and mart models, regression detection, leaderboard | Not started |
 | 5 | `feat/dashboard` | Streamlit app on DuckDB | Not started |
 | 6 | `feat/deploy-docs` | Hosted dashboard, screenshots, results, contributor docs | Not started |
