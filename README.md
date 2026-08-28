@@ -122,6 +122,35 @@ further than a regression does, and thermal throttling moves it further still, s
 a baseline is built per configuration, benchmark, precision, and batch size, with
 throttled runs held out.
 
+## Results
+
+The generator injects four known effects. The analytics layer is not told about
+them, so finding them is a fair test of the models. From a run over 280518
+deduplicated benchmark runs:
+
+| Injected effect | Designed | Detected |
+| --- | --- | --- |
+| XN family, `llm_decode_7b`, from driver 24.4.0 | -13% | -13.07% at 24.4.0 |
+| DC family, `resnet50_train`, from driver 24.5.2 | -9% | -9.65% at 24.5.2 |
+| EG family, `yolov8_detect`, from driver 24.4.0 | +16% | +17.56% at 24.4.0 |
+| XN family, `h265_encode_4k`, from driver 24.5.2 | +9% | +9.21% at 24.5.2 |
+
+No false positives: of 638 configuration and benchmark cells with no injected
+change, zero were reported as moved.
+
+Two detectors are needed, and the reason is instructive. A rolling baseline finds
+a change but not a state: once around 30 regressed runs accumulate, the baseline
+has itself dropped to the regressed level and the z-score returns to zero, so a
+regression still costing throughput every day goes quiet. It raised one alert for
+the sharpest of the four and missed the rest. Comparing each cell against a fixed
+reference, its own median on the previous driver version, found all four. Both
+models are kept, because the first answers "did something just change" and the
+second answers "what did this release break, and is it still broken".
+
+The efficiency leaderboard puts the mobile parts on top on throughput per watt,
+ahead of datacenter parts with 30 times the power budget, which is what ranking
+on efficiency rather than raw throughput is for.
+
 ## Quickstart
 
 Requires Docker Desktop or Docker Engine with compose v2. Nothing else needs to
@@ -221,7 +250,7 @@ what runs today.
 | 1 | `feat/scaffold` | Repo layout, shared settings, compose stack, images, CI | Done |
 | 2 | `feat/producer` | Synthetic benchmark generator and Redpanda producer | Done |
 | 3 | `feat/spark-consumer` | Structured streaming job writing partitioned Parquet | Done |
-| 4 | `feat/dbt-models` | Staging and mart models, regression detection, leaderboard | Not started |
+| 4 | `feat/dbt-models` | Staging and mart models, regression detection, leaderboard | Done |
 | 5 | `feat/dashboard` | Streamlit app on DuckDB | Not started |
 | 6 | `feat/deploy-docs` | Hosted dashboard, screenshots, results, contributor docs | Not started |
 

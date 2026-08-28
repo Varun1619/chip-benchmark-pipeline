@@ -1,0 +1,9 @@
+# Kept in the project directory so the same file works in the container and on
+# a host, rather than depending on a developer's ~/.dbt.
+chip_benchmark:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '/data/warehouse/benchmarks.duckdb') }}"
+      threads: 4

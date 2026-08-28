@@ -205,6 +205,25 @@ Throttled runs are excluded from the baseline rather than averaged into it.
 Throttling moves a result further than the regression does, so leaving it in
 means the baseline tracks cooling conditions instead of performance.
 
+## Why there are two regression detectors
+
+`fct_run_baselines` scores each run against a rolling window of its own recent
+history. It is the right shape for "did something just change", and it is what
+most tutorials stop at.
+
+It is not sufficient. A rolling baseline detects a change, not a state. Once
+about 30 regressed runs accumulate, the window contains only regressed runs, the
+baseline has dropped to match, and the z-score returns to zero. Measured on
+generated data with four known effects present, it raised one alert, for the
+sharpest, and missed the other three entirely.
+
+`mart_driver_comparison` compares each cell's median against a fixed reference,
+its own median on the previous driver version. That found all four effects at
+their designed magnitude, with no false positives across 638 unaffected cells.
+
+Both are kept. The rolling model catches a change the moment it appears, and the
+version model tells you what a release broke and whether it is still broken.
+
 ## Duplicates are expected, and removed in staging
 
 A measured lake held 366328 rows for 280518 distinct `run_id` values. Two causes,

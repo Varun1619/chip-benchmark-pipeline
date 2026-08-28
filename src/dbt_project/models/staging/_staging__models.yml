@@ -1,0 +1,52 @@
+version: 2
+
+models:
+  - name: stg_benchmark_runs
+    description: >
+      One row per benchmark run, deduplicated on run_id and typed. The
+      uniqueness test here is the one that proves deduplication works, since
+      the source it reads is known to contain repeats.
+    columns:
+      - name: run_id
+        description: Unique per benchmark attempt.
+        tests:
+          - unique
+          - not_null
+      - name: run_started_at
+        tests:
+          - not_null
+      - name: run_date
+        description: Partition column of the lake, derived from run_started_at.
+        tests:
+          - not_null
+      - name: config_id
+        tests:
+          - not_null
+      - name: benchmark_name
+        tests:
+          - not_null
+      - name: workload_category
+        tests:
+          - not_null
+          - accepted_values:
+              values: [ai_ml, computer_vision, media_gaming, productivity]
+      - name: run_status
+        tests:
+          - not_null
+          - accepted_values:
+              values: [completed, failed, timeout]
+      - name: precision_mode
+        tests:
+          - not_null
+          - accepted_values:
+              values: [fp32, bf16, fp16, int8]
+      - name: segment
+        tests:
+          - accepted_values:
+              values: [mobile, edge, datacenter]
+      - name: batch_size
+        tests:
+          - not_null
+      - name: thermal_throttled
+        tests:
+          - not_null

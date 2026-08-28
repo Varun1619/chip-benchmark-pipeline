@@ -1,0 +1,116 @@
+version: 2
+
+models:
+  - name: dim_configurations
+    description: One row per configuration under test, derived from the runs.
+    columns:
+      - name: config_id
+        tests:
+          - unique
+          - not_null
+      - name: total_runs
+        tests:
+          - not_null
+
+  - name: fct_benchmark_runs
+    description: >
+      One row per run with the efficiency measures derived. Throughput per watt
+      is the measure the leaderboard ranks on.
+    columns:
+      - name: run_id
+        tests:
+          - unique
+          - not_null
+      - name: config_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_configurations')
+              field: config_id
+      - name: throughput_per_watt
+        description: Null for a failed run, which reports no measurements.
+
+  - name: fct_run_baselines
+    description: >
+      Every completed, unthrottled run scored against a rolling baseline of its
+      own recent history at the configuration, benchmark, precision and batch
+      size grain.
+    columns:
+      - name: run_id
+        tests:
+          - unique
+          - not_null
+      - name: baseline_sample_count
+        tests:
+          - not_null
+      - name: is_regressed
+        tests:
+          - not_null
+
+  - name: mart_regression_alerts
+    description: >
+      Cells whose runs breach both the z-score and percentage thresholds on a
+      given driver version, with a severity for triage order.
+    columns:
+      - name: severity
+        tests:
+          - not_null
+          - accepted_values:
+              values: [critical, warning, watch]
+      - name: regressed_share
+        tests:
+          - not_null
+
+  - name: mart_config_leaderboard
+    description: >
+      Configurations ranked by median throughput per watt, per workload
+      category and across all workloads.
+    columns:
+      - name: efficiency_rank
+        tests:
+          - not_null
+      - name: config_id
+        tests:
+          - not_null
+      - name: efficiency_index
+        description: Percentage of the category leader's efficiency.
+        tests:
+          - not_null
+
+  - name: mart_driver_comparison
+    description: >
+      Each cell's median throughput on a driver version against the previous
+      one. Answers what a release broke and whether it is still broken, which a
+      rolling baseline cannot once it has absorbed the change.
+    columns:
+      - name: verdict
+        tests:
+          - not_null
+          - accepted_values:
+              values: [regression, improvement, stable]
+      - name: pct_change
+        tests:
+          - not_null
+
+  - name: mart_daily_benchmark_trend
+    description: Daily medians per family and category for the trend charts.
+    columns:
+      - name: run_date
+        tests:
+          - not_null
+      - name: runs
+        tests:
+          - not_null
+
+  - name: mart_pipeline_health
+    description: >
+      Ingestion volume and data quality per day, so a drop in data can be told
+      apart from a drop in performance.
+    columns:
+      - name: run_date
+        tests:
+          - unique
+          - not_null
+      - name: failure_share
+        tests:
+          - not_null

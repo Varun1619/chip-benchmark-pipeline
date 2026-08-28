@@ -28,6 +28,11 @@ data/*
 !data/.gitkeep
 !data/sample/
 !data/sample/**
+# The directory has to exist for DuckDB to create the warehouse file in it,
+# so the placeholder is tracked while the database itself is not.
+!data/warehouse/
+data/warehouse/*
+!data/warehouse/.gitkeep
 
 # DuckDB artifacts written outside data/
 *.duckdb

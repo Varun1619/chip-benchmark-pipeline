@@ -23,8 +23,20 @@ RUN mkdir -p src/common src/dashboard \
 
 COPY src/common ./src/common
 COPY src/dashboard ./src/dashboard
+COPY src/dbt_project ./src/dbt_project
+
+# dbt looks here for profiles.yml, which lives with the project so the same
+# file works in the container and on a host.
+ENV DBT_PROFILES_DIR=/app/src/dbt_project
 
 RUN useradd --create-home --uid 10001 appuser
+
+# dbt writes target/ and its partial parse cache inside the project directory,
+# so it has to be writable by the user the container runs as. Logs go to a
+# scratch path for the same reason.
+RUN chown -R appuser:appuser /app/src/dbt_project
+ENV DBT_LOG_PATH=/tmp/dbt-logs
+
 USER appuser
 
 EXPOSE 8501
