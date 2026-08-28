@@ -84,10 +84,15 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D100", "D103", "ARG001"]
+# A test docstring states the property under test, which reads better as a
+# statement than as an imperative, so D401 is off for tests only.
+"tests/*" = ["D100", "D103", "D401", "ARG001"]
 # The catalogues are reference tables. Aligned rows read better than one
 # field per line, which costs a few long lines and nothing else.
 "src/producer/catalog.py" = ["E501"]
+# `from pyspark.sql import functions as F` is the convention in every PySpark
+# codebase, so the naming rule loses to consistency here.
+"src/consumer/*" = ["N812"]
 
 [tool.ruff.format]
 quote-style = "double"

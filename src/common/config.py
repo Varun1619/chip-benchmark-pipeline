@@ -58,6 +58,13 @@ class Settings(BaseSettings):
         default=Path("data"),
         description="Root of the local data lake, warehouse and checkpoints.",
     )
+    checkpoint_root: Path | None = Field(
+        default=None,
+        description=(
+            "Where streaming checkpoints live. Defaults under DATA_ROOT. Point it at a "
+            "container volume to keep the metadata log off a slow bind mount."
+        ),
+    )
     spark_trigger_interval: str = Field(
         default="30 seconds",
         description="Processing time trigger for the structured streaming query.",
@@ -112,9 +119,24 @@ class Settings(BaseSettings):
         return self.lake_root / "benchmark_runs"
 
     @property
+    def checkpoints_dir(self) -> Path:
+        """Base directory for streaming checkpoints."""
+        return self.checkpoint_root or (self.data_root / "checkpoints")
+
+    @property
     def checkpoint_path(self) -> Path:
         """Structured streaming checkpoint location for the raw runs query."""
-        return self.data_root / "checkpoints" / "benchmark_runs"
+        return self.checkpoints_dir / "benchmark_runs"
+
+    @property
+    def quarantine_path(self) -> Path:
+        """Records the consumer could not parse, kept with their raw bytes."""
+        return self.lake_root / "quarantine"
+
+    @property
+    def quarantine_checkpoint_path(self) -> Path:
+        """Checkpoint for the quarantine query, separate from the lake query."""
+        return self.checkpoints_dir / "quarantine"
 
     @property
     def duckdb_path(self) -> Path:

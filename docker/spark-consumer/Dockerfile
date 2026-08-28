@@ -52,6 +52,12 @@ COPY src/common ./src/common
 COPY src/consumer ./src/consumer
 
 RUN useradd --create-home --uid 10001 appuser
+
+# The checkpoint volume mounts here. Creating the directory in the image with
+# the right owner means Docker seeds the named volume with that ownership, so
+# the non-root user can write its metadata log.
+RUN mkdir -p /checkpoints && chown appuser:appuser /checkpoints
+
 USER appuser
 
 EXPOSE 4040

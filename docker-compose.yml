@@ -81,8 +81,13 @@ services:
     environment:
       <<: *common-env
       SPARK_TRIGGER_INTERVAL: ${SPARK_TRIGGER_INTERVAL:-30 seconds}
+      # Checkpoints are internal state that nobody inspects, and the streaming
+      # metadata log is compacted constantly. Keeping it in a container volume
+      # rather than on the host bind mount avoids that cost.
+      CHECKPOINT_ROOT: /checkpoints
     volumes:
       - ./data:/data
+      - spark-checkpoints:/checkpoints
     ports:
       - "${SPARK_UI_PORT:-4040}:4040" # Spark UI while the streaming query runs
     restart: unless-stopped
@@ -133,3 +138,4 @@ services:
 
 volumes:
   redpanda-data:
+  spark-checkpoints:
